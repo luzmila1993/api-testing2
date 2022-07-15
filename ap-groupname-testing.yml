@@ -1,0 +1,67 @@
+trigger:
+- main
+
+pool:
+  name: <poolName>
+
+parameters:
+- name: environment
+  displayName: Environment to deploy
+  values:
+    - dev
+
+variables:
+- template: variables-${{ parameters.environment }}.yml
+
+stages:
+- stage: 'Testing'
+  jobs:
+  - job: GetCredentials
+    steps:
+    - bash: |
+        echo "##vso[task.setvariable variable=xAPIKey;isOutput=true]$(xapikey)"
+        echo "##vso[task.setvariable variable=xAPISecret;isOutput=true]$(xapisecret)"
+      name: credentials
+  - job: ResquestTestingAPI
+    pool: server
+    timeoutInMinutes: 1
+    cancelTimeoutInMinutes: 1
+    dependsOn: GetCredentials
+    variables:
+      xapikey: $[dependencies.GetCredentials.outputs['credentials.xAPIKey']]
+      xapisecret: $[dependencies.GetCredentials.outputs['credentials.xAPISecret']]
+    steps:
+    - task: InvokeRESTAPI@1
+      inputs:
+        connectionType: 'connectedServiceName'
+        serviceConnection: 'apiTesting'
+        method: 'POST'
+        headers: |
+          {
+          "Content-Type":"application/json",
+          "X-API-Key": "$(xapikey)",
+          "X-API-Secret": "$(xapisecret)"
+          }
+        body: |
+          {
+              "options":{
+                "allAssertions":true,
+                "JUnitFormat":true
+              }
+          }
+        waitForCompletion: 'false'
+  - job: PublishTest
+    dependsOn: ResquestTestingAPI
+    condition: succeeded()
+    steps:
+    - task: Bash@3
+      displayName: 'Format the test result in azure way'
+      inputs:
+        targetType: filePath
+        filePath: ./supportfiles/testresultformatting.sh
+        arguments: './supportfiles/test.xml test-output.xml'
+    - task: PublishTestResults@2
+      displayName: 'Publish Test Results'
+      inputs:
+        testResultsFiles: 'test-output.xml'
+        failTaskOnFailedTests: true

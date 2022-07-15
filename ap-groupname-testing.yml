@@ -50,3 +50,18 @@ stages:
               }
           }
         waitForCompletion: 'false'
+  - job: PublishTest
+    dependsOn: ResquestTestingAPI
+    condition: succeeded()
+    steps:
+    - task: Bash@3
+      displayName: 'Format the test result in azure way'
+      inputs:
+        targetType: filePath
+        filePath: ./supportfiles/testresultformatting.sh
+        arguments: './supportfiles/test.xml test-output.xml'
+    - task: PublishTestResults@2
+      displayName: 'Publish Test Results'
+      inputs:
+        testResultsFiles: 'test-output.xml'
+        failTaskOnFailedTests: true

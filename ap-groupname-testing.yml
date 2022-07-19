@@ -46,7 +46,7 @@ stages:
           {
               "options":{
                 "allAssertions":true,
-                "JUnitFormat":true
+                "JUnitFormat":false
               }
           }
         waitForCompletion: 'false'
